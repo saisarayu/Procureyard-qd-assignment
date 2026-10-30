@@ -4,3 +4,5 @@ node_modules/
 __pycache__/
 *.pyc
 !payswift/server.pyc
+*.db
+.pytest_cache/

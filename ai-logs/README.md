@@ -1,1 +1,1 @@
-Put exports, of your main AI sessions here. We allow AI; we want to see how you work with it.
+The JSON files in this directory are application-generated interaction records written by `app/agent/llm_provider.py`. The inspected records identify `provider: fallback` and `model: deterministic-rule-fallback`; they are not exports from an AI chat platform and their provenance cannot be represented as genuine raw AI-session exports. Replace them with actual platform exports before submission if available. No credentials are included here.

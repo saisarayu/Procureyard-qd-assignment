@@ -4,3 +4,58 @@ services:
     build: ./payswift
     ports:
       - "8081:8081"
+    healthcheck:
+      test: ["CMD", "python", "-c", "import urllib.request; urllib.request.urlopen('http://localhost:8081/health')"]
+      interval: 5s
+      timeout: 3s
+      retries: 5
+
+  db:
+    image: postgres:16-alpine
+    environment:
+      POSTGRES_USER: postgres
+      POSTGRES_PASSWORD: postgres
+      POSTGRES_DB: quickdrop
+    ports:
+      - "5432:5432"
+    volumes:
+      - pgdata:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U postgres"]
+      interval: 5s
+      timeout: 3s
+      retries: 5
+
+  app:
+    build: .
+    ports:
+      - "8000:8000"
+    environment:
+      DATABASE_URL: postgresql+asyncpg://postgres:postgres@db:5432/quickdrop
+      DATABASE_URL_SYNC: postgresql://postgres:postgres@db:5432/quickdrop
+      PAYSWIFT_BASE_URL: http://payswift:8081
+      LLM_PROVIDER: ${LLM_PROVIDER:-groq}
+      GROQ_API_KEY: ${GROQ_API_KEY:-}
+      GEMINI_API_KEY: ${GEMINI_API_KEY:-}
+      APP_HOST: ${APP_HOST:-0.0.0.0}
+      APP_PORT: ${APP_PORT:-8000}
+      LOG_LEVEL: ${LOG_LEVEL:-info}
+      OPS_USERNAME: ${OPS_USERNAME:-ops}
+      OPS_PASSWORD: ${OPS_PASSWORD:-quickdrop2026}
+      AUTO_PAY_MAX_AMOUNT: ${AUTO_PAY_MAX_AMOUNT:-200}
+      AUTO_PAY_MAX_PER_DAY: ${AUTO_PAY_MAX_PER_DAY:-1}
+      DISPUTE_WINDOW_DAYS: ${DISPUTE_WINDOW_DAYS:-7}
+    depends_on:
+      db:
+        condition: service_healthy
+      payswift:
+        condition: service_healthy
+    healthcheck:
+      test: ["CMD", "python", "-c", "import urllib.request; urllib.request.urlopen('http://localhost:8000/health')"]
+      interval: 10s
+      timeout: 5s
+      retries: 10
+      start_period: 15s
+
+volumes:
+  pgdata:
