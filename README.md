@@ -12,8 +12,8 @@ FastAPI orchestrates complaint handling, PostgreSQL stores imported trip/payout 
 
 ## Validation
 
-Docker Compose services were healthy; migrations and CSV import succeeded. The full suite passed (**64 passed**). Live evaluation against a clean running PostgreSQL/FastAPI/PaySwift stack passed **8/8**: A ₹25, B ₹15, C ₹150 provider-confirmed payments; D ₹10 pending approval; E/F escalated; G outside-window; H clarification. A separate INR 1 sandbox payout was provider-confirmed; same-key replay returned the same payout and the provider ledger contained one record.
+Docker Compose services were healthy; migrations and CSV import succeeded. The full suite passed (**66 passed**). Live evaluation against a clean running PostgreSQL/FastAPI/PaySwift stack passed **8/8**: A ₹25, B ₹15, C ₹150 provider-confirmed payments; D ₹10 pending approval; E/F escalated; G outside-window; H clarification. The dashboard successfully approved D and rejected E with credentials; the ₹10 approval was verified in PaySwift. A separate INR 1 sandbox payout was provider-confirmed; same-key replay returned the same payout and the provider ledger contained one record.
 
 ## Limitations
 
-`ai-logs/` contains app-generated deterministic fallback records, not genuine raw AI-platform session exports. The dashboard rendered and its trace view worked; see the runtime report for action/auth evidence. GitHub Actions is configured for every push, but no remote CI run was observed. LLM interpretation is unavailable without a configured provider key.
+`ai-logs/` contains app-generated deterministic fallback records, not genuine raw AI-platform session exports. GitHub Actions is configured for every push, but no remote CI run was observed. LLM interpretation is unavailable without a configured provider key.
