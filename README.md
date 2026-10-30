@@ -4,7 +4,7 @@ QuickDrop investigates rider payout complaints against trip and payout records, 
 
 ## Run
 
-Run `docker compose up --build`; open the API at `http://localhost:8000` and operations dashboard at `/ops`. PostgreSQL, FastAPI, and the PaySwift sandbox start together. To run the live evaluation, use `python evals/run.py http://localhost:8000 --payswift-url http://localhost:8081`. The deterministic fallback works without an LLM key. Local operations credentials default to `ops` / `quickdrop2026`; change them outside local development.
+Run `docker compose up --build`; open the API at `http://localhost:8000` and operations dashboard at `/ops`. PostgreSQL, FastAPI, and the PaySwift sandbox start together. The dashboard shows live pending approvals and escalations, supports rider message/audit-trace lookup, and records reviewer decisions with required notes. Use **Show mock cases** (or open `/ops?demo=1`) only to preview sample dashboard rows; demo decisions are local simulations and never call PaySwift or change live records. To run the live evaluation, use `python evals/run.py http://localhost:8000 --payswift-url http://localhost:8081`. The deterministic fallback works without an LLM key. Local operations credentials default to `ops` / `quickdrop2026`; change them outside local development.
 
 ## Architecture and decisions
 

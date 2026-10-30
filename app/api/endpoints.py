@@ -429,17 +429,31 @@ async def ops_dashboard():
       line-height: 1.5;
       padding: 24px;
     }
+    .page { max-width: 1600px; margin: 0 auto; }
     .header {
       display: flex;
       justify-content: space-between;
-      align-items: center;
-      padding-bottom: 20px;
+      align-items: flex-start;
+      gap: 24px;
+      padding-bottom: 22px;
       border-bottom: 1px solid var(--border);
-      margin-bottom: 24px;
+      margin-bottom: 22px;
     }
-    .header h1 { font-size: 24px; font-weight: 700; color: #fff; }
+    .header h1 { font-size: clamp(22px, 3vw, 30px); font-weight: 700; color: #fff; }
+    .subtitle { color: var(--text-muted); margin-top: 5px; }
+    .header-tools { display: grid; gap: 12px; min-width: min(100%, 520px); }
     .ops-login { display: flex; align-items: center; gap: 8px; flex-wrap: wrap; }
-    .ops-login input { width: 130px; padding: 7px; border: 1px solid var(--border); border-radius: 6px; background: var(--bg); color: var(--text); }
+    .ops-login input, .resolution-fields input, .resolution-fields textarea, .trace-search input {
+      width: 100%; padding: 9px 10px; border: 1px solid var(--border); border-radius: 7px;
+      background: var(--bg); color: var(--text); font: inherit;
+    }
+    .ops-login input { width: 140px; min-width: 110px; }
+    .ops-login input:focus, .resolution-fields input:focus, .resolution-fields textarea:focus, .trace-search input:focus {
+      outline: 2px solid var(--primary); outline-offset: 1px;
+    }
+    .toolbar { display: flex; align-items: center; flex-wrap: wrap; gap: 8px; }
+    .toolbar .btn-demo { margin-left: auto; }
+    .auth-status { color: var(--text-muted); font-size: 12px; }
     .badge {
       display: inline-block;
       padding: 4px 10px;
@@ -451,35 +465,63 @@ async def ops_dashboard():
     .badge-pending { background: rgba(245, 158, 11, 0.2); color: var(--warning); border: 1px solid var(--warning); }
     .badge-approved { background: rgba(34, 197, 94, 0.2); color: var(--success); border: 1px solid var(--success); }
     .badge-danger { background: rgba(239, 68, 68, 0.2); color: var(--danger); border: 1px solid var(--danger); }
-    .grid { display: grid; grid-template-columns: 1fr 1fr; gap: 24px; }
+    .badge-live { background: rgba(34, 197, 94, 0.12); color: #86efac; border: 1px solid rgba(34, 197, 94, 0.5); }
+    .grid { display: grid; grid-template-columns: minmax(0, 1.15fr) minmax(340px, .85fr); gap: 20px; align-items: start; }
     .card {
       background: var(--card-bg);
       border: 1px solid var(--border);
       border-radius: 12px;
       padding: 20px;
       margin-bottom: 20px;
+      min-width: 0;
     }
-    .card h2 { font-size: 18px; margin-bottom: 16px; display: flex; justify-content: space-between; align-items: center; }
-    table { width: 100%; border-collapse: collapse; text-align: left; font-size: 14px; }
-    th { color: var(--text-muted); padding: 10px; border-bottom: 1px solid var(--border); font-weight: 600; }
-    td { padding: 12px 10px; border-bottom: 1px solid var(--border); }
+    .card h2 { font-size: 18px; margin-bottom: 14px; display: flex; justify-content: space-between; align-items: center; gap: 12px; }
+    .section-kicker { color: var(--primary); font-size: 11px; font-weight: 700; letter-spacing: .08em; text-transform: uppercase; margin-bottom: 5px; }
+    .section-copy { color: var(--text-muted); font-size: 13px; margin: -5px 0 16px; }
+    .metrics { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 12px; margin-bottom: 20px; }
+    .metric { background: var(--card-bg); border: 1px solid var(--border); border-radius: 10px; padding: 14px 16px; }
+    .metric-label { display: block; color: var(--text-muted); font-size: 12px; }
+    .metric-value { display: block; font-size: 22px; font-weight: 700; margin-top: 2px; }
+    .table-wrap { width: 100%; overflow-x: auto; }
+    table { width: 100%; border-collapse: collapse; text-align: left; font-size: 13px; min-width: 650px; }
+    th { color: var(--text-muted); padding: 10px; border-bottom: 1px solid var(--border); font-weight: 600; white-space: nowrap; }
+    td { padding: 12px 10px; border-bottom: 1px solid var(--border); vertical-align: top; }
     tr:hover { background: rgba(255, 255, 255, 0.02); }
     button {
       cursor: pointer;
       border: none;
-      padding: 6px 12px;
+      padding: 8px 11px;
       border-radius: 6px;
       font-size: 13px;
       font-weight: 600;
       transition: all 0.2s;
     }
+    button:focus-visible { outline: 2px solid #fff; outline-offset: 2px; }
+    button:disabled { cursor: wait; opacity: .6; }
     .btn-approve { background: var(--success); color: #000; }
     .btn-approve:hover { filter: brightness(1.1); }
-    .btn-reject { background: var(--danger); color: #fff; margin-left: 6px; }
+    .btn-reject { background: var(--danger); color: #fff; }
     .btn-reject:hover { filter: brightness(1.1); }
-    .btn-view { background: #334155; color: #fff; margin-left: 6px; }
+    .btn-view { background: #334155; color: #fff; }
     .btn-view:hover { background: #475569; }
     .btn-refresh { background: var(--primary); color: #000; padding: 8px 16px; border-radius: 8px; }
+    .btn-demo { background: #f59e0b; color: #000; margin-left: 8px; padding: 8px 16px; border-radius: 8px; }
+    .demo-notice { display: none; color: #fde68a; font-size: 13px; font-weight: 600; margin-top: 8px; }
+    .source-label { font-size: 11px; color: var(--text-muted); margin-top: 4px; display: block; }
+    .case-actions { display: flex; flex-wrap: wrap; gap: 6px; }
+    .resolution-fields { display: grid; grid-template-columns: minmax(130px, .4fr) minmax(220px, 1fr); gap: 12px; margin: 16px 0 10px; }
+    .field { display: grid; gap: 6px; }
+    .field label { color: var(--text-muted); font-size: 12px; font-weight: 600; }
+    .resolution-fields textarea { min-height: 72px; resize: vertical; }
+    .action-hint { color: var(--text-muted); font-size: 12px; }
+    .trace-search { display: flex; gap: 8px; margin-bottom: 16px; }
+    .trace-search input { min-width: 0; }
+    .trace-search button { flex: 0 0 auto; }
+    .trace-section-title { color: var(--text-muted); font-size: 12px; text-transform: uppercase; letter-spacing: .06em; margin: 16px 0 9px; }
+    .conversation-item { padding: 10px; border: 1px solid var(--border); border-radius: 8px; margin: 8px 0; white-space: pre-wrap; overflow-wrap: anywhere; font-size: 13px; }
+    .conversation-item strong { color: var(--primary); }
+    .empty-state, .error-state { text-align: center; padding: 24px 12px; color: var(--text-muted); }
+    .error-state { color: #fca5a5; }
     .trace-item {
       padding: 10px;
       border-left: 2px solid var(--primary);
@@ -488,8 +530,9 @@ async def ops_dashboard():
       border-radius: 0 6px 6px 0;
       font-size: 13px;
     }
-    .trace-time { color: var(--text-muted); font-size: 11px; }
+    .trace-time { color: var(--text-muted); font-size: 11px; overflow-wrap: anywhere; }
     .trace-type { font-weight: 600; color: var(--primary); }
+    .trace-item pre { white-space: pre-wrap; overflow-wrap: anywhere; }
     pre {
       background: #090d16;
       padding: 10px;
@@ -500,66 +543,141 @@ async def ops_dashboard():
       margin-top: 6px;
     }
     #detailPanel { display: none; }
+    @media (max-width: 1000px) {
+      body { padding: 18px; }
+      .header { flex-direction: column; }
+      .header-tools { width: 100%; }
+      .grid { grid-template-columns: 1fr; }
+    }
+    @media (max-width: 620px) {
+      body { padding: 12px; }
+      .card { padding: 15px; }
+      .toolbar .btn-demo { margin-left: 0; }
+      .metrics { gap: 7px; }
+      .metric { padding: 11px 9px; }
+      .metric-value { font-size: 18px; }
+      .resolution-fields { grid-template-columns: 1fr; }
+      .trace-search { flex-wrap: wrap; }
+      .trace-search button { width: 100%; }
+    }
   </style>
 </head>
 <body>
-  <div class="header">
-    <div>
-      <h1>QuickDrop Rider Payout Dispute Desk</h1>
-      <p style="color: var(--text-muted); font-size: 14px;">Deterministic Reconciled Dispute Operations & Approvals</p>
-    </div>
-    <div>
-      <div class="ops-login">
-        <label for="opsUsername">Ops user</label>
-        <input id="opsUsername" name="username" autocomplete="username" aria-label="Operations username">
-        <label for="opsPassword">Password</label>
-        <input id="opsPassword" name="password" type="password" autocomplete="current-password" aria-label="Operations password">
-        <input id="opsDecisionNotes" name="decision-notes" aria-label="Decision notes" placeholder="Decision notes">
-        <button class="btn-view" onclick="setOpsCredentials()">Set credentials</button>
-        <span id="opsAuthStatus" role="status">Credentials required for decisions</span>
+  <div class="page">
+    <header class="header">
+      <div>
+        <h1>QuickDrop Rider Payout Dispute Desk</h1>
+        <p class="subtitle">Reconciled disputes, investigation traces, and operations decisions</p>
+        <p id="demoModeNotice" class="demo-notice">DEMO MODE — sample cases only; actions are simulated and no payment will be sent.</p>
       </div>
-      <button class="btn-refresh" onclick="loadPending()">Refresh Pending</button>
-    </div>
-  </div>
+      <div class="header-tools">
+        <div class="ops-login">
+          <label for="opsUsername">Ops user</label>
+          <input id="opsUsername" name="username" autocomplete="username" aria-label="Operations username">
+          <label for="opsPassword">Password</label>
+          <input id="opsPassword" name="password" type="password" autocomplete="current-password" aria-label="Operations password">
+          <button class="btn-view" id="setCredentialsButton" type="button">Set credentials</button>
+        </div>
+        <div class="toolbar">
+          <button class="btn-refresh" id="refreshPendingButton" type="button">Refresh cases</button>
+          <button id="demoModeToggle" class="btn-demo" type="button">Show mock cases</button>
+          <span id="opsAuthStatus" class="auth-status" role="status">Live cases; credentials required for decisions</span>
+        </div>
+      </div>
+    </header>
 
-  <div class="grid">
-    <div>
-      <div class="card">
-        <h2>
-          <span>Pending Approvals & Escalations</span>
+    <section class="metrics" aria-label="Pending case summary">
+      <div class="metric"><span class="metric-label">Pending approvals</span><strong id="approvalMetric" class="metric-value">—</strong></div>
+      <div class="metric"><span class="metric-label">Escalations</span><strong id="escalationMetric" class="metric-value">—</strong></div>
+      <div class="metric"><span class="metric-label">Known amount under review</span><strong id="amountMetric" class="metric-value">—</strong></div>
+    </section>
+
+    <main class="grid">
+      <section class="card" aria-labelledby="pendingHeading">
+        <p class="section-kicker">Workflow 1 · Pending approvals</p>
+        <h2 id="pendingHeading">
+          <span>Disputes needing review</span>
           <span id="pendingCount" class="badge badge-pending">0</span>
         </h2>
-        <table>
-          <thead>
-            <tr>
-              <th>Rider</th>
-              <th>Type</th>
-              <th>Amount</th>
-              <th>Reason</th>
-              <th>Action</th>
-            </tr>
-          </thead>
-          <tbody id="pendingTable">
-            <tr><td colspan="5" style="text-align: center; color: var(--text-muted);">Loading pending cases...</td></tr>
-          </tbody>
-        </table>
-      </div>
-    </div>
+        <p class="section-copy">Review the rider, disputed amount, and reason before resolving a case.</p>
+        <div class="table-wrap">
+          <table>
+            <thead>
+              <tr>
+                <th>Rider</th>
+                <th>Type</th>
+                <th>Amount</th>
+                <th>Escalation reason</th>
+                <th>Received</th>
+                <th>Actions</th>
+              </tr>
+            </thead>
+            <tbody id="pendingTable">
+              <tr><td colspan="6" class="empty-state">Loading live cases…</td></tr>
+            </tbody>
+          </table>
+        </div>
+        <p class="section-kicker" style="margin-top: 20px;">Workflow 3 · Case resolution</p>
+        <div class="resolution-fields">
+          <div class="field">
+            <label for="opsReviewer">Reviewer</label>
+            <input id="opsReviewer" name="reviewer" autocomplete="name" placeholder="Reviewer name">
+          </div>
+          <div class="field">
+            <label for="opsDecisionNotes">Decision notes (required)</label>
+            <textarea id="opsDecisionNotes" name="decision-notes" placeholder="Explain why this case is approved or rejected"></textarea>
+          </div>
+        </div>
+        <p class="action-hint" id="resolutionHint">Approval may initiate a PaySwift payout when financially eligible. Verify the case and notes before resolving.</p>
+      </section>
 
-    <div>
-      <div class="card" id="detailPanel">
-        <h2>Rider Audit Trace & Context: <span id="detailRider" style="color: var(--primary);"></span></h2>
-        <div id="detailTrace" style="max-height: 480px; overflow-y: auto;"></div>
-      </div>
-      <div class="card" id="emptyDetail">
-        <h2>Audit Trace Inspector</h2>
-        <p style="color: var(--text-muted);">Select a pending case or view rider to inspect their full action history, reconciliation evidence, and messages.</p>
-      </div>
-    </div>
+      <section class="card" aria-labelledby="traceHeading">
+        <p class="section-kicker">Workflow 2 · Audit trace</p>
+        <h2 id="traceHeading">Inspect an investigation</h2>
+        <p class="section-copy">Search any rider to view their message history and the agent’s reconciliation steps.</p>
+        <form class="trace-search" id="traceSearchForm">
+          <input id="traceRiderId" name="rider-id" aria-label="Rider ID" placeholder="Enter rider ID, e.g. R014" autocomplete="off">
+          <button class="btn-refresh" type="submit">Inspect rider</button>
+        </form>
+        <div id="emptyDetail" class="empty-state">Choose Trace on a pending case or enter a rider ID to inspect their activity.</div>
+        <div id="detailPanel">
+          <h2>Rider: <span id="detailRider" style="color: var(--primary);"></span></h2>
+          <span id="traceSource" class="badge badge-live">Live backend data</span>
+          <div id="detailMessages"></div>
+          <div id="detailTrace"></div>
+        </div>
+      </section>
+    </main>
   </div>
 
   <script>
     let opsAuthorization = null;
+    let demoMode = new URLSearchParams(window.location.search).get('demo') === '1';
+    let displayedDemoMode = null;
+    const demoPendingItems = [
+      {
+        id: 'mock-approval-r014',
+        rider_id: 'MOCK-R014',
+        type: 'approval',
+        amount: 350,
+        reason: 'Sample shortfall requiring operations review'
+      },
+      {
+        id: 'mock-escalation-r031',
+        rider_id: 'MOCK-R031',
+        type: 'escalation',
+        amount: 5000,
+        reason: 'Sample distance anomaly; verify before any payout'
+      },
+      {
+        id: 'mock-approval-r007',
+        rider_id: 'MOCK-R007',
+        type: 'approval',
+        amount: 120,
+        reason: 'Sample repeat dispute requiring manual review'
+      }
+    ];
+    const demoDecisions = {};
 
     function getOpsAuthorization() {
       return opsAuthorization;
@@ -578,130 +696,250 @@ async def ops_dashboard():
       status.textContent = 'Credentials set; access checked on action';
     }
 
+    function toggleDemoMode() {
+      demoMode = !demoMode;
+      const params = new URLSearchParams(window.location.search);
+      if (demoMode) {
+        params.set('demo', '1');
+      } else {
+        params.delete('demo');
+      }
+      const query = params.toString();
+      window.history.replaceState(null, '', `${window.location.pathname}${query ? '?' + query : ''}`);
+      displayedDemoMode = null;
+      loadPending();
+    }
+
+    let pendingItems = [];
+
+    function updateDemoModeIndicator() {
+      document.getElementById('demoModeNotice').style.display = demoMode ? 'block' : 'none';
+      document.getElementById('demoModeToggle').textContent = demoMode ? 'Return to live cases' : 'Show mock cases';
+      if (displayedDemoMode !== demoMode) {
+        document.getElementById('opsAuthStatus').textContent = demoMode
+          ? 'Demo mode: actions are local simulations only'
+          : (opsAuthorization ? 'Credentials set; access checked when resolving' : 'Live cases; credentials required for decisions');
+        displayedDemoMode = demoMode;
+      }
+      document.getElementById('resolutionHint').textContent = demoMode
+        ? 'Demo mode: decisions are simulated locally and never reach the backend or PaySwift.'
+        : 'Approval may initiate a PaySwift payout when financially eligible. Verify the case and notes before resolving.';
+      document.getElementById('traceSource').textContent = demoMode ? 'Demo-only sample' : 'Live backend data';
+      document.getElementById('traceSource').className = `badge ${demoMode ? 'badge-pending' : 'badge-live'}`;
+    }
+
+    function escapeHTML(value) {
+      return String(value ?? '').replace(/[&<>"']/g, character => ({
+        '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;'
+      })[character]);
+    }
+
+    function formatTimestamp(value) {
+      if (!value) return '—';
+      const date = new Date(value);
+      return Number.isNaN(date.getTime()) ? '—' : date.toLocaleString();
+    }
+
+    function renderSummary(items) {
+      const approvals = items.filter(item => item.type === 'approval').length;
+      const escalations = items.filter(item => item.type === 'escalation').length;
+      const amount = items.reduce((total, item) => total + (Number(item.amount) || 0), 0);
+      document.getElementById('pendingCount').textContent = items.length;
+      document.getElementById('approvalMetric').textContent = approvals;
+      document.getElementById('escalationMetric').textContent = escalations;
+      document.getElementById('amountMetric').textContent = `₹${amount.toLocaleString('en-IN')}`;
+    }
+
+    function renderPending(items) {
+      const tbody = document.getElementById('pendingTable');
+      renderSummary(items);
+      if (!items.length) {
+        tbody.innerHTML = '<tr><td colspan="6" class="empty-state">No live cases are awaiting operations review. Rider audit traces remain searchable.</td></tr>';
+        return;
+      }
+
+      tbody.innerHTML = items.map(item => `
+        <tr>
+          <td><strong>${escapeHTML(item.rider_id)}</strong></td>
+          <td><span class="badge ${item.type === 'approval' ? 'badge-pending' : 'badge-danger'}">${escapeHTML(item.type)}</span></td>
+          <td><strong>${item.amount !== null && item.amount !== undefined ? '₹' + escapeHTML(item.amount) : '—'}</strong></td>
+          <td>${escapeHTML(item.reason)}</td>
+          <td>${escapeHTML(formatTimestamp(item.created_at))}</td>
+          <td><div class="case-actions">
+            <button class="btn-approve" type="button" data-action="approve" data-id="${escapeHTML(item.id)}" data-rider="${escapeHTML(item.rider_id)}">Approve</button>
+            <button class="btn-reject" type="button" data-action="reject" data-id="${escapeHTML(item.id)}" data-rider="${escapeHTML(item.rider_id)}">Reject</button>
+            <button class="btn-view" type="button" data-action="trace" data-rider="${escapeHTML(item.rider_id)}">Trace</button>
+          </div></td>
+        </tr>
+      `).join('');
+    }
+
     async function loadPending() {
+      updateDemoModeIndicator();
       try {
-        const res = await fetch('/ops/pending');
-        const items = await res.json();
-        const tbody = document.getElementById('pendingTable');
-        document.getElementById('pendingCount').textContent = items.length;
-
-        if (items.length === 0) {
-          tbody.innerHTML = '<tr><td colspan="5" style="text-align: center; color: var(--text-muted);">No pending approvals. All disputes clear!</td></tr>';
-          return;
+        let items;
+        if (demoMode) {
+          items = demoPendingItems.map(item => ({ ...item, created_at: new Date().toISOString() }));
+        } else {
+          const res = await fetch('/ops/pending');
+          if (!res.ok) throw new Error(`Pending cases request failed (${res.status})`);
+          items = await res.json();
         }
-
-        tbody.innerHTML = items.map(item => `
-          <tr>
-            <td><strong>${item.rider_id}</strong></td>
-            <td><span class="badge ${item.type === 'approval' ? 'badge-pending' : 'badge-danger'}">${item.type}</span></td>
-            <td><strong>${item.amount ? '₹' + item.amount : '—'}</strong></td>
-            <td style="max-width: 220px; font-size: 13px;">${item.reason}</td>
-            <td>
-              <button class="btn-approve" onclick="approveCase('${item.id}', '${item.rider_id}')">Approve</button>
-              <button class="btn-reject" onclick="rejectCase('${item.id}', '${item.rider_id}')">Reject</button>
-              <button class="btn-view" onclick="viewTrace('${item.rider_id}')">Trace</button>
-            </td>
-          </tr>
-        `).join('');
+        pendingItems = items;
+        renderPending(items);
       } catch (err) {
-        console.error('Failed to load pending:', err);
+        document.getElementById('pendingTable').innerHTML =
+          `<tr><td colspan="6" class="error-state">Could not load live cases: ${escapeHTML(err.message)}</td></tr>`;
+        document.getElementById('opsAuthStatus').textContent = 'Failed to load pending cases';
       }
     }
 
-    async function approveCase(id, riderId) {
-      if (!confirm(`Are you sure you want to approve this dispute for ${riderId}? PaySwift payment will be disbursed.`)) return;
-      const authorization = getOpsAuthorization();
-      if (!authorization) {
-        document.getElementById('opsAuthStatus').textContent = 'Set operations credentials first';
+    function simulateDemoDecision(id, riderId, decision, notes) {
+      demoDecisions[riderId] = {
+        at: new Date().toISOString(),
+        decision,
+        notes
+      };
+      const index = demoPendingItems.findIndex(item => item.id === id);
+      if (index !== -1) demoPendingItems.splice(index, 1);
+      loadPending();
+      viewTrace(riderId);
+      document.getElementById('opsAuthStatus').textContent =
+        `Mock ${decision} recorded locally; no payment was sent`;
+    }
+
+    async function resolveCase(action, id, riderId) {
+      const reviewer = document.getElementById('opsReviewer').value.trim();
+      const notes = document.getElementById('opsDecisionNotes').value.trim();
+      const status = document.getElementById('opsAuthStatus');
+      if (!reviewer || !notes) {
+        status.textContent = 'Enter reviewer name and decision notes before resolving';
         return;
       }
+      if (demoMode) {
+        if (!confirm(`Demo only: simulate ${action} for ${riderId}? No live case or payment will be changed.`)) return;
+        simulateDemoDecision(id, riderId, action === 'approve' ? 'approved' : 'rejected', notes);
+        status.textContent = `Mock ${action} recorded locally; no payment was sent`;
+        return;
+      }
+      const authorization = getOpsAuthorization();
+      if (!authorization) {
+        status.textContent = 'Set operations credentials first';
+        return;
+      }
+      const caseItem = pendingItems.find(item => item.id === id);
+      if (!confirm(`${action === 'approve' ? 'Approve' : 'Reject'} the case for ${riderId}?${action === 'approve' && Number(caseItem?.amount) > 0 ? ` This may disburse ₹${caseItem.amount} through PaySwift.` : ''}`)) return;
       try {
-        const res = await fetch(`/ops/approvals/${id}/approve`, {
+        const res = await fetch(`/ops/approvals/${encodeURIComponent(id)}/${action}`, {
           method: 'POST',
           headers: { 'Content-Type': 'application/json', 'Authorization': authorization },
-          body: JSON.stringify({ reviewer: 'ops_dashboard', notes: 'Approved via Ops Dashboard' })
+          body: JSON.stringify({ reviewer, notes })
         });
         const data = await res.json();
         if (!res.ok) {
           if (res.status === 401) {
             opsAuthorization = null;
-            document.getElementById('opsAuthStatus').textContent = 'Invalid operations credentials';
+            status.textContent = 'Invalid operations credentials';
           }
-          alert('Error: ' + (data.detail || data.message));
+          throw new Error(data.detail || data.message || `Operation failed (${res.status})`);
         } else {
-          document.getElementById('opsAuthStatus').textContent = 'Operations action completed';
-          alert('Success: ' + data.message);
-          loadPending();
-          viewTrace(riderId);
+          status.textContent = data.message;
+          await loadPending();
+          await viewTrace(riderId);
         }
       } catch (err) {
-        alert('Request failed: ' + err.message);
-      }
-    }
-
-    async function rejectCase(id, riderId) {
-      const reason = document.getElementById('opsDecisionNotes').value.trim();
-      if (!reason) {
-        document.getElementById('opsAuthStatus').textContent = 'Enter decision notes before rejecting';
-        return;
-      }
-      const authorization = getOpsAuthorization();
-      if (!authorization) {
-        document.getElementById('opsAuthStatus').textContent = 'Set operations credentials first';
-        return;
-      }
-      try {
-        const res = await fetch(`/ops/approvals/${id}/reject`, {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json', 'Authorization': authorization },
-          body: JSON.stringify({ reviewer: 'ops_dashboard', notes: reason })
-        });
-        const data = await res.json();
-        if (!res.ok) {
-          if (res.status === 401) {
-            opsAuthorization = null;
-            document.getElementById('opsAuthStatus').textContent = 'Invalid operations credentials';
-          }
-          alert('Error: ' + (data.detail || data.message));
-        } else {
-          document.getElementById('opsAuthStatus').textContent = 'Operations action completed';
-          alert('Success: ' + data.message);
-          loadPending();
-          viewTrace(riderId);
-        }
-      } catch (err) {
-        alert('Request failed: ' + err.message);
+        status.textContent = `Operation failed: ${err.message}`;
       }
     }
 
     async function viewTrace(riderId) {
+      riderId = riderId.trim();
+      if (!riderId) return;
       document.getElementById('emptyDetail').style.display = 'none';
       document.getElementById('detailPanel').style.display = 'block';
       document.getElementById('detailRider').textContent = riderId;
       const traceContainer = document.getElementById('detailTrace');
-      traceContainer.innerHTML = '<p style="color: var(--text-muted);">Loading audit trace...</p>';
+      const messagesContainer = document.getElementById('detailMessages');
+      traceContainer.innerHTML = '<p class="empty-state">Loading investigation events…</p>';
+      messagesContainer.innerHTML = '';
+      updateDemoModeIndicator();
 
       try {
-        const res = await fetch(`/trace/${riderId}`);
-        const steps = await res.json();
-        if (steps.length === 0) {
-          traceContainer.innerHTML = '<p style="color: var(--text-muted);">No trace events recorded for this rider.</p>';
+        let steps = [];
+        let messages = [];
+        if (demoMode) {
+          steps = [{
+            at: new Date().toISOString(),
+            type: 'demo',
+            name: 'Sample dispute context',
+            input: { rider_id: riderId },
+            output: { source: 'mock fixture', payment_sent: false }
+          }];
+          if (demoDecisions[riderId]) {
+            steps.push({
+              at: demoDecisions[riderId].at,
+              type: 'demo',
+              name: 'Simulated operations decision',
+              input: { decision: demoDecisions[riderId].decision, notes: demoDecisions[riderId].notes },
+              output: { persisted: false, payment_sent: false }
+            });
+          }
+        } else {
+          const [traceRes, messagesRes] = await Promise.all([
+            fetch(`/trace/${encodeURIComponent(riderId)}`),
+            fetch(`/ops/conversations/${encodeURIComponent(riderId)}`)
+          ]);
+          if (!traceRes.ok) throw new Error(`Rider trace request failed (${traceRes.status})`);
+          if (!messagesRes.ok) throw new Error(`Rider conversation request failed (${messagesRes.status})`);
+          [steps, messages] = await Promise.all([traceRes.json(), messagesRes.json()]);
+        }
+
+        messagesContainer.innerHTML = messages.length ? `
+          <h3 class="trace-section-title">Rider messages and agent replies</h3>
+          ${messages.map(message => `
+            <div class="conversation-item">
+              <strong>${escapeHTML(message.rider_id)} · ${escapeHTML(formatTimestamp(message.received_at))}</strong>
+              <span class="source-label">Message ${escapeHTML(message.message_id)}</span>
+              <div>${escapeHTML(message.text)}</div>
+              ${message.reply ? `<div><strong>Agent reply:</strong> ${escapeHTML(message.reply)}</div>` : ''}
+            </div>
+          `).join('')}
+        ` : '';
+
+        if (!steps.length) {
+          traceContainer.innerHTML = '<p class="empty-state">No audit trace events recorded for this rider.</p>';
           return;
         }
 
-        traceContainer.innerHTML = steps.map(s => `
+        traceContainer.innerHTML = `<h3 class="trace-section-title">Agent investigation timeline</h3>` + steps.map(s => `
           <div class="trace-item">
-            <div class="trace-time">${new Date(s.at).toLocaleTimeString()} · <span class="trace-type">${s.type}</span> · <strong>${s.name}</strong></div>
-            ${s.input ? '<pre>Input: ' + JSON.stringify(s.input, null, 2) + '</pre>' : ''}
-            ${s.output ? '<pre>Output: ' + JSON.stringify(s.output, null, 2) + '</pre>' : ''}
+            <div class="trace-time">${escapeHTML(formatTimestamp(s.at))} · <span class="trace-type">${escapeHTML(s.type)}</span> · <strong>${escapeHTML(s.name)}</strong></div>
+            ${s.input ? `<pre>Input: ${escapeHTML(JSON.stringify(s.input, null, 2))}</pre>` : ''}
+            ${s.output ? `<pre>Output: ${escapeHTML(JSON.stringify(s.output, null, 2))}</pre>` : ''}
           </div>
         `).join('');
       } catch (err) {
-        traceContainer.innerHTML = '<p style="color: var(--danger);">Failed to load trace.</p>';
+        messagesContainer.innerHTML = '';
+        traceContainer.innerHTML = `<p class="error-state">Could not load rider investigation: ${escapeHTML(err.message)}</p>`;
       }
     }
 
-    // Initial load
+    document.getElementById('setCredentialsButton').addEventListener('click', setOpsCredentials);
+    document.getElementById('refreshPendingButton').addEventListener('click', loadPending);
+    document.getElementById('demoModeToggle').addEventListener('click', toggleDemoMode);
+    document.getElementById('pendingTable').addEventListener('click', event => {
+      const button = event.target.closest('button[data-action]');
+      if (!button) return;
+      const { action, id, rider } = button.dataset;
+      if (action === 'trace') viewTrace(rider);
+      else resolveCase(action, id, rider);
+    });
+    document.getElementById('traceSearchForm').addEventListener('submit', event => {
+      event.preventDefault();
+      viewTrace(document.getElementById('traceRiderId').value);
+    });
+
+    updateDemoModeIndicator();
     loadPending();
   </script>
 </body>
