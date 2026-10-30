@@ -1,17 +1,19 @@
 # QuickDrop Rider Payout Dispute Desk
 
-FastAPI service that investigates rider payout complaints against trip and payout records, explains outcomes, and routes risky or above-policy cases to operations. Money is reconciled against PaySwift; local database records are not treated as proof of provider payment.
+QuickDrop investigates rider payout complaints against trip and payout records, explains outcomes, and routes risky or above-policy cases to operations. Payments are reconciled with the PaySwift provider ledger.
 
 ## Run
 
-Copy `.env.example` to `.env`, set an LLM key if desired, then run `docker compose up --build`. The stack exposes the API/dashboard on `http://localhost:8000` and PaySwift on `http://localhost:8081`. The deterministic fallback runs without an LLM key. The local sample operations credentials are `ops` / `quickdrop2026`; replace them outside local development. Run the public-interface evaluation with `python evals/run.py http://localhost:8000 --payswift-url http://localhost:8081`.
+Run `docker compose up --build`; open the API at `http://localhost:8000` and operations dashboard at `/ops`. PostgreSQL, FastAPI, and the PaySwift sandbox start together. To run the live evaluation, use `python evals/run.py http://localhost:8000 --payswift-url http://localhost:8081`. The deterministic fallback works without an LLM key. Local operations credentials default to `ops` / `quickdrop2026`; change them outside local development.
 
-## Design and assumptions
+## Architecture and decisions
 
-The LLM (Groq or Gemini) interprets English/Hindi/Hinglish complaints and drafts explanations. Python code owns identity checks, trip and payout lookup, fare/incentive calculations, dispute windows, the ₹200 / one-payment-per-rider-per-day policy, audit traces, and PaySwift requests. Stable message-derived idempotency keys and a durable message reservation protect retries; operations approve/reject actions require HTTP Basic credentials. The policy window and payment cap follow the supplied brief; the included records and sandbox are treated as the source of truth. Without an LLM key, regex/rule fallback is used.
+FastAPI orchestrates complaint handling, PostgreSQL stores imported trip/payout and dispute records, and PaySwift is the authority for payment confirmation. Groq/Gemini may interpret English, Hindi, or Hinglish and draft explanations; deterministic Python code owns identity checks, calculations, policy limits, dispute windows, escalation, and payment requests. The ₹200 cap and seven-day window follow the assignment; imported records and provider responses are treated as source of truth. Durable message reservations and stable idempotency keys protect retries.
 
-## Validation and limitations
+## Validation
 
-Final local suite: **62 passed**. Live FastAPI/SQLite health: **200**, database connected. The URL-based evaluation reached the running service: **5/8 passed**; its three auto-pay cases correctly failed because PaySwift was unreachable. Approve and reject both returned **401** without credentials. Compose configuration validates, but Docker’s daemon was unavailable, so PostgreSQL, the full Compose stack, the bundled PaySwift process, and a real sandbox transaction were not run. See [`runtime-validation-report.md`](./runtime-validation-report.md) for evidence.
+Docker Compose services were healthy; migrations and CSV import succeeded. The full suite passed (**64 passed**). Live evaluation against a clean running PostgreSQL/FastAPI/PaySwift stack passed **8/8**: A ₹25, B ₹15, C ₹150 provider-confirmed payments; D ₹10 pending approval; E/F escalated; G outside-window; H clarification. A separate INR 1 sandbox payout was provider-confirmed; same-key replay returned the same payout and the provider ledger contained one record.
 
-`ai-logs/` contains app-generated JSON interaction records; inspected records identify the deterministic fallback provider, not exports from an AI chat platform. They do not establish genuine raw-session-export provenance and should be replaced with actual tool exports before submission. Browser rendering and GitHub Actions execution were not verified in this environment.
+## Limitations
+
+`ai-logs/` contains app-generated deterministic fallback records, not genuine raw AI-platform session exports. The dashboard rendered and its trace view worked; see the runtime report for action/auth evidence. GitHub Actions is configured for every push, but no remote CI run was observed. LLM interpretation is unavailable without a configured provider key.

@@ -438,6 +438,8 @@ async def ops_dashboard():
       margin-bottom: 24px;
     }
     .header h1 { font-size: 24px; font-weight: 700; color: #fff; }
+    .ops-login { display: flex; align-items: center; gap: 8px; flex-wrap: wrap; }
+    .ops-login input { width: 130px; padding: 7px; border: 1px solid var(--border); border-radius: 6px; background: var(--bg); color: var(--text); }
     .badge {
       display: inline-block;
       padding: 4px 10px;
@@ -507,6 +509,15 @@ async def ops_dashboard():
       <p style="color: var(--text-muted); font-size: 14px;">Deterministic Reconciled Dispute Operations & Approvals</p>
     </div>
     <div>
+      <div class="ops-login">
+        <label for="opsUsername">Ops user</label>
+        <input id="opsUsername" name="username" autocomplete="username" aria-label="Operations username">
+        <label for="opsPassword">Password</label>
+        <input id="opsPassword" name="password" type="password" autocomplete="current-password" aria-label="Operations password">
+        <input id="opsDecisionNotes" name="decision-notes" aria-label="Decision notes" placeholder="Decision notes">
+        <button class="btn-view" onclick="setOpsCredentials()">Set credentials</button>
+        <span id="opsAuthStatus" role="status">Credentials required for decisions</span>
+      </div>
       <button class="btn-refresh" onclick="loadPending()">Refresh Pending</button>
     </div>
   </div>
@@ -548,6 +559,25 @@ async def ops_dashboard():
   </div>
 
   <script>
+    let opsAuthorization = null;
+
+    function getOpsAuthorization() {
+      return opsAuthorization;
+    }
+
+    function setOpsCredentials() {
+      const username = document.getElementById('opsUsername').value;
+      const password = document.getElementById('opsPassword').value;
+      const status = document.getElementById('opsAuthStatus');
+      if (!username || !password) {
+        opsAuthorization = null;
+        status.textContent = 'Enter both operations credentials';
+        return;
+      }
+      opsAuthorization = `Basic ${btoa(`${username}:${password}`)}`;
+      status.textContent = 'Credentials set; access checked on action';
+    }
+
     async function loadPending() {
       try {
         const res = await fetch('/ops/pending');
@@ -580,16 +610,26 @@ async def ops_dashboard():
 
     async function approveCase(id, riderId) {
       if (!confirm(`Are you sure you want to approve this dispute for ${riderId}? PaySwift payment will be disbursed.`)) return;
+      const authorization = getOpsAuthorization();
+      if (!authorization) {
+        document.getElementById('opsAuthStatus').textContent = 'Set operations credentials first';
+        return;
+      }
       try {
         const res = await fetch(`/ops/approvals/${id}/approve`, {
           method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
+          headers: { 'Content-Type': 'application/json', 'Authorization': authorization },
           body: JSON.stringify({ reviewer: 'ops_dashboard', notes: 'Approved via Ops Dashboard' })
         });
         const data = await res.json();
         if (!res.ok) {
+          if (res.status === 401) {
+            opsAuthorization = null;
+            document.getElementById('opsAuthStatus').textContent = 'Invalid operations credentials';
+          }
           alert('Error: ' + (data.detail || data.message));
         } else {
+          document.getElementById('opsAuthStatus').textContent = 'Operations action completed';
           alert('Success: ' + data.message);
           loadPending();
           viewTrace(riderId);
@@ -600,18 +640,35 @@ async def ops_dashboard():
     }
 
     async function rejectCase(id, riderId) {
-      const reason = prompt('Reason for rejection:', 'Does not meet dispute criteria');
-      if (reason === null) return;
+      const reason = document.getElementById('opsDecisionNotes').value.trim();
+      if (!reason) {
+        document.getElementById('opsAuthStatus').textContent = 'Enter decision notes before rejecting';
+        return;
+      }
+      const authorization = getOpsAuthorization();
+      if (!authorization) {
+        document.getElementById('opsAuthStatus').textContent = 'Set operations credentials first';
+        return;
+      }
       try {
         const res = await fetch(`/ops/approvals/${id}/reject`, {
           method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
+          headers: { 'Content-Type': 'application/json', 'Authorization': authorization },
           body: JSON.stringify({ reviewer: 'ops_dashboard', notes: reason })
         });
         const data = await res.json();
-        alert(data.message);
-        loadPending();
-        viewTrace(riderId);
+        if (!res.ok) {
+          if (res.status === 401) {
+            opsAuthorization = null;
+            document.getElementById('opsAuthStatus').textContent = 'Invalid operations credentials';
+          }
+          alert('Error: ' + (data.detail || data.message));
+        } else {
+          document.getElementById('opsAuthStatus').textContent = 'Operations action completed';
+          alert('Success: ' + data.message);
+          loadPending();
+          viewTrace(riderId);
+        }
       } catch (err) {
         alert('Request failed: ' + err.message);
       }

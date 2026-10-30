@@ -75,6 +75,77 @@ async def test_create_payout_idempotency_conflict(httpx_mock: HTTPXMock):
 
 
 @pytest.mark.asyncio
+async def test_create_payout_idempotency_replay_returns_original_payout(httpx_mock: HTTPXMock):
+    """The sandbox returns HTTP 200 with the original payout on an idempotency replay."""
+    httpx_mock.add_response(
+        url="http://payswift:8081/v1/payouts",
+        method="POST",
+        status_code=200,
+        json={"payout_id": "ps_existing", "status": "processed", "amount": 1, "rider_id": "R017"},
+    )
+
+    async with PaySwiftClient(base_url="http://payswift:8081") as client:
+        response = await client.create_payout(
+            rider_id="R017",
+            amount=1,
+            reference="audit",
+            idempotency_key="key-dup",
+        )
+
+    assert response["payout_id"] == "ps_existing"
+    assert response["status"] == "processed"
+
+
+@pytest.mark.asyncio
+async def test_create_payout_retries_503_with_idempotency_key(httpx_mock: HTTPXMock):
+    """A temporary 503 is retried using the same safe idempotency key."""
+    for status_code, payload in (
+        (503, {"error": "service_unavailable"}),
+        (201, {"payout_id": "ps_retried", "status": "processed", "amount": 150, "rider_id": "R005"}),
+    ):
+        httpx_mock.add_response(
+            url="http://payswift:8081/v1/payouts",
+            method="POST",
+            status_code=status_code,
+            json=payload,
+        )
+
+    async with PaySwiftClient(base_url="http://payswift:8081") as client:
+        response = await client.create_payout(
+            rider_id="R005",
+            amount=150,
+            reference="daily-incentive",
+            idempotency_key="stable-key",
+        )
+
+    requests = httpx_mock.get_requests()
+    assert response["payout_id"] == "ps_retried"
+    assert len(requests) == 2
+    assert all(request.headers["Idempotency-Key"] == "stable-key" for request in requests)
+
+
+@pytest.mark.asyncio
+async def test_create_payout_does_not_retry_503_without_idempotency_key(httpx_mock: HTTPXMock):
+    httpx_mock.add_response(
+        url="http://payswift:8081/v1/payouts",
+        method="POST",
+        status_code=503,
+        json={"error": "service_unavailable"},
+    )
+
+    async with PaySwiftClient(base_url="http://payswift:8081") as client:
+        with pytest.raises(PaySwiftError) as error:
+            await client.create_payout(
+                rider_id="R005",
+                amount=150,
+                reference="daily-incentive",
+            )
+
+    assert error.value.status_code == 503
+    assert len(httpx_mock.get_requests()) == 1
+
+
+@pytest.mark.asyncio
 async def test_get_payouts_by_rider(httpx_mock: HTTPXMock):
     """GET /v1/payouts?rider_id=R017 returns list of payouts."""
     payout_list = [

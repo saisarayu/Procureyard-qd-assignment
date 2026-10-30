@@ -36,6 +36,11 @@ class PaySwiftTimeout(Exception):
     pass
 
 
+class PaySwiftRetryableError(PaySwiftError):
+    """A provider error that is safe to retry with an idempotency key."""
+    pass
+
+
 
 class PaySwiftClient:
     """Client for the PaySwift Payouts API sandbox."""
@@ -76,7 +81,9 @@ class PaySwiftClient:
     @retry(
         stop=stop_after_attempt(3),
         wait=wait_exponential(multiplier=0.5, min=0.5, max=4),
-        retry=retry_if_exception_type((httpx.ConnectError, httpx.TimeoutException)),
+        retry=retry_if_exception_type(
+            (PaySwiftUnavailable, PaySwiftTimeout, PaySwiftRetryableError)
+        ),
         reraise=True,
     )
     async def create_payout(
@@ -126,7 +133,7 @@ class PaySwiftClient:
             logger.error(f"PaySwift connection failed: {e}")
             raise PaySwiftUnavailable(f"Cannot reach PaySwift: {e}")
 
-        if resp.status_code == 201:
+        if resp.status_code in (200, 201):
             data = resp.json()
             logger.info(f"PaySwift payout succeeded: id={data.get('payout_id')}, status={data.get('status')}")
             return data
@@ -140,12 +147,14 @@ class PaySwiftClient:
         else:
             detail = resp.text
             logger.error(f"PaySwift HTTP error {resp.status_code}: {detail}")
+            if resp.status_code == 503 and idempotency_key:
+                raise PaySwiftRetryableError(resp.status_code, detail)
             raise PaySwiftError(resp.status_code, detail)
 
     @retry(
         stop=stop_after_attempt(3),
         wait=wait_exponential(multiplier=0.5, min=0.5, max=4),
-        retry=retry_if_exception_type((httpx.ConnectError, httpx.TimeoutException)),
+        retry=retry_if_exception_type((PaySwiftUnavailable, PaySwiftTimeout)),
         reraise=True,
     )
     async def get_payouts(self, rider_id: Optional[str] = None) -> List[Dict[str, Any]]:

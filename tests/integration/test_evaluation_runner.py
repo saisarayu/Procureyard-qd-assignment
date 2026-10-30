@@ -17,7 +17,7 @@ DATA_DIR = Path(__file__).resolve().parent.parent.parent / "data"
 
 @pytest.mark.asyncio
 async def test_evaluation_runner_in_process():
-    """Verify that evaluation runner can successfully run against FastAPI test client."""
+    """Without an external provider ledger, the runner must not claim auto-pays passed."""
     engine = create_async_engine("sqlite+aiosqlite:///:memory:", echo=False)
     session_maker = async_sessionmaker(engine, expire_on_commit=False)
 
@@ -48,7 +48,7 @@ async def test_evaluation_runner_in_process():
     transport = httpx.ASGITransport(app=app)
     async with httpx.AsyncClient(transport=transport, base_url="http://test") as test_client:
         success = await run_evaluation(base_url="http://test", client=test_client)
-        assert success is True
+        assert success is False
 
     orchestrator.payswift = orig_ps
     orchestrator.llm = orig_llm

@@ -170,6 +170,11 @@ async def run_evaluation(
             }
 
             try:
+                pending_before_resp = await client.get(f"{base_url}/ops/pending")
+                pending_before_resp.raise_for_status()
+                pending_before = pending_before_resp.json()
+                pending_before_ids = {item["id"] for item in pending_before}
+
                 # 1. POST /messages
                 resp = await client.post(f"{base_url}/messages", json=payload)
                 if resp.status_code != 200:
@@ -189,14 +194,23 @@ async def run_evaluation(
 
                 # 2. GET /trace/{rider_id}
                 trace_resp = await client.get(f"{base_url}/trace/{sc.rider_id}")
-                trace_items = trace_resp.json() if trace_resp.status_code == 200 else []
+                trace_resp.raise_for_status()
+                trace_items = trace_resp.json()
 
                 # 3. GET /ops/pending
                 pending_resp = await client.get(f"{base_url}/ops/pending")
-                pending_items = pending_resp.json() if pending_resp.status_code == 200 else []
+                pending_resp.raise_for_status()
+                pending_items = pending_resp.json()
 
                 # Analyze outcome
-                is_escalated = any(p.get("rider_id") == sc.rider_id for p in pending_items)
+                new_ops_items = [
+                    item for item in pending_items
+                    if item.get("id") not in pending_before_ids
+                    and item.get("rider_id") == sc.rider_id
+                ]
+                is_escalated = bool(new_ops_items)
+                has_escalation = any(item.get("type") == "escalation" for item in new_ops_items)
+                approval_items = [item for item in new_ops_items if item.get("type") == "approval"]
                 expected_idempotency_key = (
                     "qd-msg-" + hashlib.sha256(msg_id.encode("utf-8")).hexdigest()
                 )
@@ -215,7 +229,8 @@ async def run_evaluation(
                     and payment_output.get("status") == "paid"
                     and bool(payment_output.get("payswift_payout_id"))
                 )
-                provider_verified = payment_succeeded
+                provider_verified = False
+                verified_amount = None
                 if payment_succeeded and payswift_url:
                     try:
                         payouts_resp = await client.get(
@@ -223,46 +238,71 @@ async def run_evaluation(
                             params={"rider_id": sc.rider_id},
                         )
                         payouts_resp.raise_for_status()
-                        payouts = payouts_resp.json()
-                        provider_verified = any(
-                            payout.get("payout_id") == payment_output["payswift_payout_id"]
-                            for payout in payouts
-                        )
-                    except (httpx.HTTPError, ValueError, TypeError) as e:
+                        payout_payload = payouts_resp.json()
+                        if isinstance(payout_payload, list):
+                            payouts = payout_payload
+                        elif isinstance(payout_payload, dict) and isinstance(payout_payload.get("data"), list):
+                            payouts = payout_payload["data"]
+                        else:
+                            raise ValueError("Unexpected PaySwift payout-list response shape")
+                        matching_payouts = [
+                            payout for payout in payouts
+                            if payout.get("payout_id") == payment_output["payswift_payout_id"]
+                            and payout.get("rider_id") == sc.rider_id
+                        ]
+                        if len(matching_payouts) == 1:
+                            provider_record = matching_payouts[0]
+                            verified_amount = int(provider_record.get("amount", 0))
+                            provider_verified = (
+                                provider_record.get("status") in ("processed", "paid")
+                                and verified_amount == sc.expected_amount
+                            )
+                    except (httpx.HTTPError, ValueError, TypeError, KeyError) as e:
                         print(f"[!] PaySwift transaction verification failed: {e}")
                         provider_verified = False
 
                 actual_outcome = "unknown"
                 if provider_verified:
                     actual_outcome = "auto_paid"
+                elif has_escalation:
+                    actual_outcome = "escalated"
+                elif approval_items:
+                    actual_outcome = "pending_approval"
                 elif "outside" in reply_text.lower() or "7-day" in reply_text.lower():
                     actual_outcome = "outside_window"
                 elif "?" in reply_text or "order" in reply_text.lower() or "date" in reply_text.lower() and "mismatch" not in reply_text.lower():
                     actual_outcome = "clarification"
-                elif "mismatch" in reply_text.lower() or "unusual distance" in reply_text.lower():
-                    actual_outcome = "escalated"
                 elif "operations" in reply_text.lower() or "approval" in reply_text.lower() or "forwarded" in reply_text.lower():
                     actual_outcome = "pending_approval"
 
                 # Check pass/fail criteria
-                passed = False
-                if sc.expected_outcome == "auto_paid":
-                    passed = provider_verified
-                elif sc.expected_outcome == "pending_approval":
-                    passed = ("operations" in reply_text.lower() or "approval" in reply_text.lower() or is_escalated)
-                elif sc.expected_outcome == "escalated":
-                    passed = ("mismatch" in reply_text.lower() or "unusual distance" in reply_text.lower() or is_escalated)
-                elif sc.expected_outcome == "outside_window":
-                    passed = ("outside" in reply_text.lower() or "7-day" in reply_text.lower())
-                elif sc.expected_outcome == "clarification":
-                    passed = ("?" in reply_text or "order" in reply_text.lower() or "date" in reply_text.lower())
+                passed = (
+                    actual_outcome == sc.expected_outcome
+                    and is_escalated == sc.expected_escalation
+                    and (
+                        sc.expected_amount is None
+                        or (provider_verified and verified_amount == sc.expected_amount)
+                        if sc.expected_outcome == "auto_paid"
+                        else sc.expected_amount is None
+                        or any(int(item.get("amount") or 0) == sc.expected_amount for item in approval_items)
+                    )
+                )
 
                 results.append({
                     "name": sc.name,
                     "status": "PASS" if passed else "FAIL",
                     "expected": sc.expected_outcome,
                     "actual": actual_outcome,
-                    "payment": f"INR {sc.expected_amount}" if sc.expected_outcome == "auto_paid" else "None",
+                    "payment": (
+                        f"INR {verified_amount} (provider verified)"
+                        if provider_verified
+                        else f"None; approval INR {approval_items[0].get('amount')}"
+                        if approval_items
+                        else "None"
+                    ),
+                    "provider_verified": "Yes" if provider_verified else (
+                        "No" if sc.expected_outcome == "auto_paid" else "N/A"
+                    ),
                     "escalated": "Yes" if is_escalated else "No",
                     "reply": reply_text[:90] + ("..." if len(reply_text) > 90 else ""),
                 })
@@ -274,21 +314,22 @@ async def run_evaluation(
                     "expected": sc.expected_outcome,
                     "actual": f"Error: {e}",
                     "payment": "Error",
+                    "provider_verified": "No",
                     "escalated": "Error",
                     "reply": str(e),
                 })
 
         # Print Formatted Report Table
-        print(f"\n{'#':<3} | {'Scenario Name':<42} | {'Expected':<16} | {'Actual':<16} | {'Payment':<8} | {'Escalated':<9} | {'Status'}")
-        print("-" * 110)
+        print(f"\n{'#':<3} | {'Scenario':<52} | {'Expected':<16} | {'Actual':<16} | {'Payment amount':<30} | {'Provider':<9} | {'Ops':<5} | {'Result'}")
+        print("-" * 155)
         passed_count = 0
         for i, r in enumerate(results, start=1):
             if r["status"] == "PASS":
                 passed_count += 1
-            print(f"{i:<3} | {r['name'][:42]:<42} | {r['expected']:<16} | {r['actual']:<16} | {r['payment']:<8} | {r['escalated']:<9} | {r['status']}")
+            print(f"{i:<3} | {r['name']:<52} | {r['expected']:<16} | {r['actual']:<16} | {r['payment']:<30} | {r['provider_verified']:<9} | {r['escalated']:<5} | {r['status']}")
 
-        pass_rate = (passed_count / len(results)) * 100
-        print("-" * 110)
+        pass_rate = (passed_count / len(SCENARIOS)) * 100
+        print("-" * 155)
         print(f"Overall Pass Rate: {passed_count}/{len(results)} ({pass_rate:.1f}%)\n")
 
         return passed_count == len(results)
